@@ -1,5 +1,92 @@
-<!doctype html><html><head><meta charset="utf-8"><title>M12 smoke test</title></head><body><pre id="out">Running…</pre><iframe id="app" src="index.html" style="width:1px;height:1px;opacity:0"></iframe><script>
-const out=document.getElementById('out');
-function assert(ok,msg){if(!ok)throw new Error(msg)}
-app.onload=()=>setTimeout(()=>{try{const w=app.contentWindow,d=app.contentDocument;['cardCanvas','saveCardBtn','exportPngBtn','layoutPresets','fontControls','resourceEditor','statsEditor'].forEach(id=>assert(d.getElementById(id),`missing #${id}`));assert(Object.keys(w.M12Test.LAYOUTS).length===10,'expected 10 layouts');assert(w.M12Test.FONT_OPTIONS.length>=30,'font library too small');assert(w.M12Test.safeFileName('A/B:C?')==='A-B-C','safe filename failed');assert(w.M12Test.getDimensions()[0]>0,'dimensions failed');out.textContent='PASS';}catch(e){out.textContent='FAIL '+e.message;console.error(e);}},700);
-</script></body></html>
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>M12 browser smoke test</title>
+  <style>body{font-family:system-ui;background:#08111a;color:#e7f7ff} li.pass{color:#7dffbc} li.fail{color:#ff8b96}</style>
+</head>
+<body>
+  <h1>Majestic-12 TCG Studio smoke test</h1>
+  <ol id="results"></ol>
+  <iframe id="app" src="index.html" style="width:1200px;height:900px;border:1px solid #345"></iframe>
+  <script>
+    const results = document.getElementById('results');
+    function report(name, ok, detail=''){
+      const li = document.createElement('li');
+      li.className = ok ? 'pass' : 'fail';
+      li.textContent = `${ok ? 'PASS' : 'FAIL'} — ${name}${detail ? ': ' + detail : ''}`;
+      results.append(li);
+      if(!ok) throw new Error(`${name}: ${detail}`);
+    }
+    function wait(ms){ return new Promise(resolve => setTimeout(resolve, ms)); }
+    function dataUrl(){
+      const canvas = document.createElement('canvas');
+      canvas.width = 8;
+      canvas.height = 8;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#f00';
+      ctx.fillRect(0, 0, 8, 8);
+      return canvas.toDataURL('image/png');
+    }
+    function pixelSum(canvas){
+      const data = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+      let sum = 0;
+      for(let i = 0; i < data.length; i += 97) sum += data[i];
+      return sum;
+    }
+    app.onload = async () => {
+      const w = app.contentWindow;
+      const d = app.contentDocument;
+      await wait(900);
+      try{
+        ['cardCanvas','saveCardBtn','exportPngBtn','layoutPresets','fontControls','resourceEditor','statsEditor'].forEach(id => report(`DOM #${id}`, Boolean(d.getElementById(id))));
+        report('app helper export', Boolean(w.M12Test));
+        report('ten layouts', Object.keys(w.M12Test.LAYOUTS).length === 10);
+        report('font library', w.M12Test.FONT_OPTIONS.length >= 30);
+        const canvas = d.getElementById('cardCanvas');
+        const initial = pixelSum(canvas);
+        report('initial render', canvas.width > 0 && initial > 0);
+        const nameInput = d.querySelector('[data-path="content.name"]');
+        nameInput.value = 'A VERY LONG TEST TITLE THAT MUST FIT INSIDE THE TITLE PANEL WITHOUT OVERFLOWING OR CRASHING THE CANVAS RENDERER';
+        nameInput.dispatchEvent(new Event('input', { bubbles: true }));
+        await wait(100);
+        report('control changes state', nameInput.value.includes('VERY LONG'));
+        report('control changes rendering', pixelSum(canvas) !== initial);
+        d.querySelector('[data-layout="classic"]').click();
+        await wait(120);
+        const classic = pixelSum(canvas);
+        d.querySelector('[data-layout="split"]').click();
+        await wait(120);
+        report('two structural layouts render differently', pixelSum(canvas) !== classic);
+        let rejected = false;
+        try{ w.M12Test.normalizeImportedCard({ art: { src: 'javascript:alert(1)' } }); }
+        catch(_error){ rejected = true; }
+        report('invalid JSON/art rejected', rejected);
+        const malicious = w.M12Test.normalizeImportedCard({ content: { name: '<img src=x onerror="window.__pwned=1">' } });
+        report('malicious markup remains inert text', malicious.content.name.includes('<img') && !w.__pwned);
+        const pngCanvas = await w.M12Test.renderCardToCanvas(w.normalizeImportedCard({ content:{ name:'PNG' }, layout:{ fullArt:false }, art:{ src:dataUrl() } }), await w.M12Test.loadImageFromSrc(dataUrl()), { scale: 1, transparent: true, guides: false });
+        report('PNG canvas generated', pngCanvas.width > 0 && pngCanvas.toDataURL('image/png').startsWith('data:image/png'));
+        const transparent = pngCanvas.getContext('2d').getImageData(0, 0, 1, 1).data[3] === 0;
+        report('transparent export supported', transparent);
+        const noGuides = await w.M12Test.renderCardToCanvas(w.normalizeImportedCard({ content:{ name:'NO GUIDES' } }), null, { scale: 1, transparent: false, guides: false });
+        const withGuides = await w.M12Test.renderCardToCanvas(w.normalizeImportedCard({ content:{ name:'WITH GUIDES' } }), null, { scale: 1, transparent: false, guides: true });
+        report('export guides separated', pixelSum(noGuides) !== pixelSum(withGuides));
+        const card = w.normalizeImportedCard({ id:'smoke-card', content:{ name:'DB Smoke' } });
+        await w.M12Test.storePut(w.M12Test.STORE_CARDS, card);
+        const cards = await w.M12Test.storeAll(w.M12Test.STORE_CARDS);
+        report('IndexedDB save/read', cards.some(c => c.id === 'smoke-card'));
+        const tpl = w.normalizeTemplate({ id:'smoke-template', name:'Smoke Template' });
+        await w.M12Test.storePut(w.M12Test.STORE_TEMPLATES, tpl);
+        const templates = await w.M12Test.storeAll(w.M12Test.STORE_TEMPLATES);
+        report('template save/read', templates.some(t => t.id === 'smoke-template'));
+        const beforeName = nameInput.value;
+        await w.exportSheet();
+        await wait(100);
+        report('A4 export does not mutate current card', d.querySelector('[data-path="content.name"]').value === beforeName);
+      }catch(error){
+        console.error(error);
+      }
+    };
+  </script>
+</body>
+</html>

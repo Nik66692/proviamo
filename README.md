@@ -53,7 +53,7 @@ A lightweight static smoke-test page is included at `smoke-test.html`. Serve the
 
 ## Deployment
 
-No build command is required. The root directory is the output directory.
+No build command is required. The root directory is the output directory. A minimal `vercel.json` keeps Vercel in static-site mode and publishes the repository root so `index.html` and relative CSS/JS paths are available unchanged.
 
 For Vercel:
 
