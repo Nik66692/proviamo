@@ -47,6 +47,10 @@ Export a project backup regularly because browser storage can be cleared by the 
 - `Ctrl/Cmd + Y`: redo
 - `Ctrl/Cmd + E`: export PNG
 
+## Smoke testing
+
+A lightweight static smoke-test page is included at `smoke-test.html`. Serve the repository with any static server, open the page in a browser, and it will verify the required DOM controls plus core pure helpers exposed by the app.
+
 ## Deployment
 
 No build command is required. The root directory is the output directory.

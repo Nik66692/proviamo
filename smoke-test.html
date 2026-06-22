@@ -1,0 +1,5 @@
+<!doctype html><html><head><meta charset="utf-8"><title>M12 smoke test</title></head><body><pre id="out">Running…</pre><iframe id="app" src="index.html" style="width:1px;height:1px;opacity:0"></iframe><script>
+const out=document.getElementById('out');
+function assert(ok,msg){if(!ok)throw new Error(msg)}
+app.onload=()=>setTimeout(()=>{try{const w=app.contentWindow,d=app.contentDocument;['cardCanvas','saveCardBtn','exportPngBtn','layoutPresets','fontControls','resourceEditor','statsEditor'].forEach(id=>assert(d.getElementById(id),`missing #${id}`));assert(Object.keys(w.M12Test.LAYOUTS).length===10,'expected 10 layouts');assert(w.M12Test.FONT_OPTIONS.length>=30,'font library too small');assert(w.M12Test.safeFileName('A/B:C?')==='A-B-C','safe filename failed');assert(w.M12Test.getDimensions()[0]>0,'dimensions failed');out.textContent='PASS';}catch(e){out.textContent='FAIL '+e.message;console.error(e);}},700);
+</script></body></html>
