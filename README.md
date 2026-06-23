@@ -49,15 +49,17 @@ Export a project backup regularly because browser storage can be cleared by the 
 
 ## Deployment
 
-No build command is required. The root directory is the output directory.
+This is a static HTML/CSS/vanilla JavaScript project. `index.html` and the local assets are served directly from the repository root; there is no Next.js app and no build step.
 
 For Vercel:
 
 1. Import this GitHub repository.
-2. Select **Other** as the framework if needed.
-3. Leave Build Command empty.
+2. Use Framework Preset **Other**.
+3. Do not set or run any Build Command.
 4. Leave Output Directory as `.`.
 5. Deploy.
+
+The included `vercel.json` enforces this static deployment configuration so Vercel does not install dependencies or run a framework build.
 
 ## Important implementation note
 

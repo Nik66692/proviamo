@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Majestic-12 TCG Studio Smoke Test</title>
+  <style>
+    body{font-family:system-ui,sans-serif;margin:2rem;background:#0b1020;color:#f7f7fb}
+    code{background:#151b31;padding:.1rem .3rem;border-radius:.25rem}
+    .pass{color:#8ff0a4}.fail{color:#ff8f8f}
+  </style>
+</head>
+<body>
+  <h1>Smoke test</h1>
+  <p>This page verifies that the static application entrypoint and main local assets are reachable from the repository root.</p>
+  <ul id="results"></ul>
+  <script>
+    const assets = [
+      'index.html',
+      'css/base.css',
+      'css/components.css',
+      'ui/01.js',
+      'ui/02.js',
+      'ui/03.js',
+      'ui/render.js',
+      'js/00.js',
+      'js/01.js',
+      'js/02.js',
+      'js/03.js'
+    ];
+    const results = document.querySelector('#results');
+    Promise.all(assets.map(async asset => {
+      const response = await fetch(asset, { cache: 'no-store' });
+      const item = document.createElement('li');
+      item.className = response.ok ? 'pass' : 'fail';
+      item.innerHTML = `<code>${asset}</code>: ${response.status} ${response.statusText}`;
+      results.append(item);
+      if (!response.ok) throw new Error(`${asset} returned ${response.status}`);
+    })).then(() => {
+      document.body.dataset.smokeStatus = 'pass';
+    }).catch(error => {
+      document.body.dataset.smokeStatus = 'fail';
+      console.error(error);
+    });
+  </script>
+</body>
+</html>
